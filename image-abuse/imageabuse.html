@@ -1,0 +1,577 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Image Abuse Awareness Game</title>
+  <style>
+    * {
+      margin: 0; padding: 0; box-sizing: border-box;
+    }
+
+    html, body {
+      height: 100%;
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      background: url('background.png') no-repeat center center/cover;
+      color: #fff;
+      overflow-x: hidden;
+      overflow-y: auto;
+    }
+
+    body {
+      display: flex;
+      justify-content: center;
+      align-items: center;
+    }
+
+    .container {
+      background: rgba(0,0,0,0.75);
+      padding: 30px 40px;
+      border-radius: 16px;
+      max-width: 800px;
+      width: 90%;
+      box-shadow: 0 0 25px rgba(0,255,255,0.3);
+      text-align: center;
+      position: relative;
+      display: flex;
+      flex-direction: column;
+      gap: 20px;
+    }
+
+    h1 {
+      font-size: 2.6em;
+      color: #00eaff;
+      margin-bottom: 20px;
+      text-shadow: 0 0 8px #00f0ff;
+    }
+
+    .progress {
+      font-weight: bold;
+      font-size: 1.2em;
+      margin-bottom: 15px;
+    }
+
+    p.question-text {
+      font-size: 1.5em;
+      margin-bottom: 20px;
+      line-height: 1.3;
+    }
+
+    button {
+      margin: 12px 10px;
+      padding: 15px 30px;
+      font-size: 18px;
+      border: none;
+      border-radius: 10px;
+      cursor: pointer;
+      position: relative;
+      background: linear-gradient(135deg, #1d1d1d, #2a2a2a);
+      color: #fff;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      overflow: hidden;
+      transition: transform 0.2s;
+      min-width: 200px;
+    }
+
+    button::before {
+      content: '';
+      position: absolute;
+      top: -50%;
+      left: -50%;
+      width: 200%;
+      height: 200%;
+      background: linear-gradient(45deg, #00ffe7, #ff00e0, #00ffe7);
+      animation: glitch 3s linear infinite;
+      opacity: 0.08;
+      transform: rotate(30deg);
+      pointer-events: none;
+    }
+
+    @keyframes glitch {
+      0% { transform: rotate(0deg); }
+      50% { transform: rotate(360deg); }
+      100% { transform: rotate(0deg); }
+    }
+
+    button:hover:not(:disabled) {
+      transform: scale(1.05);
+    }
+
+    button:disabled {
+      cursor: not-allowed;
+      opacity: 0.5;
+    }
+
+    .safe { border: 2px solid #00ffc8; box-shadow: 0 0 12px #00ffc8; }
+    .unsafe { border: 2px solid #ff008c; box-shadow: 0 0 12px #ff008c; }
+
+    .feedback {
+      margin-top: 20px;
+      font-weight: bold;
+      font-size: 1.3em;
+      min-height: 40px;
+    }
+
+    .hint {
+      margin-top: 10px;
+      font-style: italic;
+      color: #ffa500; /* orange */
+      font-size: 1.1em;
+    }
+
+    .drag-area {
+      display: flex;
+      justify-content: space-between;
+      margin-top: 20px;
+      gap: 20px;
+    }
+
+    .zone {
+      flex: 1;
+      padding: 20px;
+      min-height: 140px;
+      border: 2px dashed #ccc;
+      border-radius: 10px;
+      background: rgba(255,255,255,0.05);
+      user-select: none;
+    }
+
+    .draggable {
+      background: #333;
+      padding: 12px 18px;
+      margin: 10px;
+      border-radius: 8px;
+      cursor: grab;
+      user-select: none;
+      font-size: 1.1em;
+    }
+
+    input[type="text"] {
+      padding: 12px;
+      font-size: 18px;
+      border-radius: 8px;
+      border: none;
+      margin: 10px 0 20px 0;
+      width: 60%;
+      max-width: 300px;
+    }
+
+    /* STRONG FULL SCREEN SHAKE - applied to entire html */
+    @keyframes fullscreen-shake {
+      0%, 100% { transform: translate3d(0, 0, 0); }
+      10%, 30%, 50%, 70%, 90% { transform: translate3d(-15px, 10px, 0) rotate(-2deg); }
+      20%, 40%, 60%, 80% { transform: translate3d(15px, -10px, 0) rotate(2deg); }
+    }
+
+    .fullscreen-shake {
+      animation: fullscreen-shake 0.3s ease-in-out 6;
+      /* will run ~1.8 seconds total */
+      /* For smoother effect, keep animation-fill-mode default */
+    }
+
+    /* Glitch flicker animation */
+    @keyframes glitch-flicker {
+      0%, 100% { opacity: 1; filter: none; }
+      20%, 80% { opacity: 0.6; filter: blur(1.5px) contrast(2); }
+      40%, 60% { opacity: 0.8; filter: invert(1) hue-rotate(45deg); }
+    }
+
+    .glitch-flicker {
+      animation: glitch-flicker 0.3s linear 6;
+    }
+
+    /* Character select styles */
+    .character-options {
+      display: flex;
+      justify-content: center;
+      gap: 30px;
+      margin-top: 20px;
+    }
+    .character {
+      width: 100px;
+      border: 2px solid transparent;
+      border-radius: 10px;
+      transition: 0.3s;
+      cursor: pointer;
+    }
+    .character:hover {
+      border-color: #00f0ff;
+      transform: scale(1.1);
+    }
+  </style>
+</head>
+<body>
+
+<div class="container">
+  <h1>Spot the Red Flag</h1>
+  <div class="progress" id="progress"></div>
+  <div id="game"></div>
+</div>
+
+<script>
+  const questions = [
+    {
+      type: 'safeUnsafe',
+      text: "Someone online offers to delete your photo after you send it privately.",
+      answer: 'UNSAFE',
+      hint: "Think about whether the photo is truly safe once sent."
+    },
+    {
+      type: 'multipleChoice',
+      text: "What should you do if someone threatens to share your private images?",
+      options: [
+        "Ignore them and hope it goes away",
+        "Give in to their demands",
+        "Tell a trusted adult or report to the platform",
+        "Delete your account"
+      ],
+      answer: "Tell a trusted adult or report to the platform",
+      hint: "Ignoring or giving in won't protect you; reporting helps."
+    },
+    {
+      type: 'textInput',
+      text: "Type one thing you should check before posting a photo of someone else.",
+      keywords: ["permission", "ask", "consent"],
+      hint: "Always get explicit consent before sharing photos."
+    },
+    {
+      type: 'dragDrop',
+      text: "Drag the red flags to the left and the safe behaviors to the right.",
+      redFlags: ["Asks for private selfies", "Threatens to expose images", "Saves your photo without asking"],
+      greenFlags: ["Explains how photos are used", "Asks for permission", "Keeps images private"],
+      hint: "Red flags belong on the left, safe behaviors on the right."
+    },
+    {
+      type: 'safeUnsafe',
+      text: "Your teacher asks for a photo for your student ID, stored securely.",
+      answer: 'SAFE',
+      hint: "Official requests for ID photos stored securely are safe."
+    },
+    {
+      type: 'multipleChoice',
+      text: "What’s a red flag in a DM from someone you just met?",
+      options: [
+        "They ask about your hobbies",
+        "They send a respectful selfie",
+        "They pressure you for photos",
+        "They invite you to a study group"
+      ],
+      answer: "They pressure you for photos",
+      hint: "Pressure for photos is a clear warning sign."
+    },
+    {
+      type: 'safeUnsafe',
+      text: "A friend uploads your image on their story without asking.",
+      answer: 'UNSAFE',
+      hint: "Uploading images without consent is unsafe."
+    },
+    {
+      type: 'textInput',
+      text: "Type one place or person you can tell if you see image abuse online.",
+      keywords: ["school", "teacher", "help", "police", "parent", "friend", "adult", "helpline"],
+      hint: "Think of someone you trust or an authority who can help."
+    },
+    {
+      type: 'multipleChoice',
+      text: "Which of these is OK to share online?",
+      options: [
+        "Photos of friends taken secretly",
+        "Edited images of others without asking",
+        "Images with everyone’s consent",
+        "Private DMs from others"
+      ],
+      answer: "Images with everyone’s consent",
+      hint: "Consent from all involved is essential."
+    },
+    {
+      type: 'safeUnsafe',
+      text: "An app asks for camera access and shows why it needs it.",
+      answer: 'SAFE',
+      hint: "Apps explaining camera use before access is safe."
+    }
+  ];
+
+  let current = 0;
+  let score = 0;
+  let characterChosen = false;
+
+  function renderCharacterSelection() {
+    document.getElementById('progress').textContent = '';
+    document.getElementById('game').innerHTML = `
+      <p style="font-size:1.4em; margin-bottom: 15px;">Choose your character:</p>
+      <div class="character-options">
+        <img src="char1.png" class="character" alt="Cyber Girl" onclick="selectCharacter('Cyber Girl')" />
+        <img src="char2.png" class="character" alt="Hacker Boy" onclick="selectCharacter('Hacker Boy')" />
+      </div>
+    `;
+  }
+
+  function selectCharacter(name) {
+    characterChosen = true;
+    current = 0;
+    score = 0;
+    document.getElementById('progress').textContent = `Good luck, ${name}!`;
+    renderQuestion();
+  }
+
+  function disableInputs(disabled = true) {
+    document.querySelectorAll('button, input[type="text"]').forEach(el => el.disabled = disabled);
+  }
+
+  function triggerErrorEffect() {
+    const html = document.documentElement;
+    html.classList.add('fullscreen-shake', 'glitch-flicker');
+    disableInputs(true);
+    setTimeout(() => {
+      html.classList.remove('fullscreen-shake', 'glitch-flicker');
+      disableInputs(false);
+    }, 1800); // animation duration 0.3s * 6 iterations = 1.8s
+  }
+
+  function showHint(text) {
+    let hintEl = document.querySelector('.hint');
+    if (!hintEl) {
+      hintEl = document.createElement('div');
+      hintEl.className = 'hint';
+      document.getElementById('game').appendChild(hintEl);
+    }
+    hintEl.textContent = text;
+  }
+
+  function clearHint() {
+    const hintEl = document.querySelector('.hint');
+    if (hintEl) hintEl.remove();
+  }
+
+  function renderQuestion() {
+    if (!characterChosen) {
+      renderCharacterSelection();
+      return;
+    }
+
+    const q = questions[current];
+    const game = document.getElementById("game");
+    document.getElementById("progress").textContent = `Question ${current + 1} of ${questions.length}`;
+    clearHint();
+
+    if (q.type === 'safeUnsafe') {
+      game.innerHTML = `
+        <p class="question-text">${q.text}</p>
+        <button class="safe" onclick="checkSafeUnsafe('SAFE')">SAFE</button>
+        <button class="unsafe" onclick="checkSafeUnsafe('UNSAFE')">UNSAFE</button>
+        <div id="feedback" class="feedback"></div>
+      `;
+    }
+    else if (q.type === 'multipleChoice') {
+      game.innerHTML = `<p class="question-text">${q.text}</p>`;
+      q.options.forEach(opt => {
+        game.innerHTML += `<button onclick="checkMC('${escapeHTML(opt)}')">${opt}</button>`;
+      });
+      game.innerHTML += `<div id="feedback" class="feedback"></div>`;
+    }
+    else if (q.type === 'textInput') {
+      game.innerHTML = `
+        <p class="question-text">${q.text}</p>
+        <input type="text" id="textAnswer" placeholder="Type your answer..." />
+        <button onclick="checkText()">Submit</button>
+        <div id="feedback" class="feedback"></div>
+      `;
+    }
+    else if (q.type === 'dragDrop') {
+      game.innerHTML = `
+        <p class="question-text">${q.text}</p>
+        <div class="drag-area">
+          <div id="left" class="zone">🚨 Red Flags</div>
+          <div id="right" class="zone">✅ Safe</div>
+        </div>
+        <div id="draggables" style="margin-top: 20px;"></div>
+        <button onclick="checkDrag()">Submit</button>
+        <div id="feedback" class="feedback"></div>
+      `;
+
+      const items = [...q.redFlags.map(txt => ({ text: txt, type: 'red' })), ...q.greenFlags.map(txt => ({ text: txt, type: 'green' }))];
+      shuffle(items);
+
+      const dragContainer = document.getElementById('draggables');
+      items.forEach(item => {
+        const div = document.createElement('div');
+        div.textContent = item.text;
+        div.className = 'draggable';
+        div.draggable = true;
+        div.dataset.type = item.type;
+
+        div.ondragstart = e => {
+          e.dataTransfer.setData('text/plain', JSON.stringify({ text: item.text, type: item.type }));
+        };
+
+        dragContainer.appendChild(div);
+      });
+
+      const containers = [document.getElementById('left'), document.getElementById('right'), dragContainer];
+
+      containers.forEach(zone => {
+        zone.ondragover = e => e.preventDefault();
+
+        zone.ondrop = e => {
+          e.preventDefault();
+          const data = JSON.parse(e.dataTransfer.getData('text/plain'));
+
+          if ([...zone.children].some(el => el.textContent === data.text)) return;
+
+          const allContainers = [dragContainer, document.getElementById('left'), document.getElementById('right')];
+          allContainers.forEach(c => {
+            const found = [...c.children].find(el => el.textContent === data.text);
+            if (found) c.removeChild(found);
+          });
+
+          const newEl = document.createElement('div');
+          newEl.textContent = data.text;
+          newEl.className = 'draggable';
+          newEl.dataset.type = data.type;
+          newEl.draggable = true;
+
+          newEl.ondragstart = e => {
+            e.dataTransfer.setData('text/plain', JSON.stringify({ text: data.text, type: data.type }));
+          };
+
+          zone.appendChild(newEl);
+        };
+      });
+    }
+    disableInputs(false);
+  }
+
+  function escapeHTML(str) {
+    return str.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#039;");
+  }
+
+  function checkSafeUnsafe(ans) {
+    const q = questions[current];
+    const feedback = document.getElementById("feedback");
+    clearHint();
+    disableInputs(true);
+
+    if (ans === q.answer) {
+      score++;
+      feedback.textContent = "✅ Correct!";
+      feedback.style.color = "#76ff03";
+      setTimeout(() => {
+        disableInputs(false);
+        nextQuestion();
+      }, 1000);
+    } else {
+      feedback.textContent = "❌ Not quite.";
+      feedback.style.color = "#ff5252";
+      showHint(q.hint || "Try again.");
+      triggerErrorEffect();
+    }
+  }
+
+  function checkMC(ans) {
+    const q = questions[current];
+    const feedback = document.getElementById("feedback");
+    clearHint();
+    disableInputs(true);
+
+    if (ans === q.answer) {
+      score++;
+      feedback.textContent = "✅ That's right!";
+      feedback.style.color = "#76ff03";
+      setTimeout(() => {
+        disableInputs(false);
+        nextQuestion();
+      }, 1000);
+    } else {
+      feedback.textContent = "❌ Nope. Think again.";
+      feedback.style.color = "#ff5252";
+      showHint(q.hint || "Try again.");
+      triggerErrorEffect();
+    }
+  }
+
+  function checkText() {
+    const q = questions[current];
+    const input = document.getElementById("textAnswer").value.toLowerCase();
+    const feedback = document.getElementById("feedback");
+    clearHint();
+    disableInputs(true);
+
+    if (q.keywords.some(k => input.includes(k))) {
+      score++;
+      feedback.textContent = "✅ Good job!";
+      feedback.style.color = "#76ff03";
+      setTimeout(() => {
+        disableInputs(false);
+        nextQuestion();
+      }, 1000);
+    } else {
+      feedback.textContent = "❌ Try to be more specific.";
+      feedback.style.color = "#ff5252";
+      showHint(q.hint || "Try again.");
+      triggerErrorEffect();
+    }
+  }
+
+  function checkDrag() {
+    const q = questions[current];
+    disableInputs(true);
+    clearHint();
+    const feedback = document.getElementById("feedback");
+
+    const leftZone = document.getElementById("left");
+    const rightZone = document.getElementById("right");
+
+    const leftTypes = [...leftZone.children].map(el => el.dataset.type);
+    const rightTypes = [...rightZone.children].map(el => el.dataset.type);
+
+    if (leftTypes.length !== q.redFlags.length || rightTypes.length !== q.greenFlags.length) {
+      feedback.textContent = "❌ Please place all items correctly.";
+      feedback.style.color = "#ff5252";
+      showHint(q.hint || "Make sure all red flags are on the left, safe behaviors on the right.");
+      triggerErrorEffect();
+      return;
+    }
+
+    const correct = leftTypes.every(t => t === 'red') && rightTypes.every(t => t === 'green');
+
+    if (correct) {
+      score++;
+      feedback.textContent = "✅ Nicely sorted!";
+      feedback.style.color = "#76ff03";
+      setTimeout(() => {
+        disableInputs(false);
+        nextQuestion();
+      }, 1000);
+    } else {
+      feedback.textContent = "❌ Oops! Some items are in the wrong zone.";
+      feedback.style.color = "#ff5252";
+      showHint(q.hint || "Make sure all red flags are on the left, safe behaviors on the right.");
+      triggerErrorEffect();
+    }
+  }
+
+  function nextQuestion() {
+    current++;
+    if (current < questions.length) {
+      renderQuestion();
+    } else {
+      document.getElementById("game").innerHTML = `
+        <p style="font-size:1.6em; margin-bottom: 15px;">🎉 Game Complete!</p>
+        <p style="font-size:1.3em; margin-bottom: 10px;">Your Score: ${score} / ${questions.length}</p>
+        <p style="font-size:1.2em;">Stay alert and protect your digital self. 💡</p>
+      `;
+      document.getElementById("progress").textContent = "";
+    }
+  }
+
+  function shuffle(arr) {
+    for (let i = arr.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [arr[i], arr[j]] = [arr[j], arr[i]];
+    }
+  }
+
+  renderCharacterSelection();
+</script>
+</body>
+</html>
