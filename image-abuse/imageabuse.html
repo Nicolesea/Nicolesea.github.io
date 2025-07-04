@@ -4,6 +4,10 @@
   <meta charset="UTF-8" />
   <title>Image Abuse Awareness Game</title>
   <style>
+    html {
+      font-size: 70%;
+    }
+
     * {
       margin: 0; padding: 0; box-sizing: border-box;
     }
@@ -20,12 +24,15 @@
     body {
       display: flex;
       justify-content: center;
-      align-items: center;
+      align-items: flex-start; /* changed from center to flex-start to reduce vertical spacing */
+      padding-top: 40px; /* add some padding top so content isn't stuck to top */
+      padding-bottom: 20px; /* reduce bottom padding to bring content closer */
+      min-height: 100vh;
     }
 
     .container {
       background: rgba(0,0,0,0.75);
-      padding: 30px 40px;
+      padding: 30px 40px 20px 40px; /* reduced bottom padding from 30 to 20 */
       border-radius: 16px;
       max-width: 800px;
       width: 90%;
@@ -35,6 +42,7 @@
       display: flex;
       flex-direction: column;
       gap: 20px;
+      margin-bottom: 0; /* remove any margin bottom */
     }
 
     h1 {
@@ -115,7 +123,7 @@
     .hint {
       margin-top: 10px;
       font-style: italic;
-      color: #ffa500; /* orange */
+      color: #ffa500;
       font-size: 1.1em;
     }
 
@@ -136,14 +144,21 @@
       user-select: none;
     }
 
+    /* Updated draggable style: small square boxes, close but not squeezed */
     .draggable {
       background: #333;
-      padding: 12px 18px;
-      margin: 10px;
+      width: 120px;
+      height: 45px;
+      margin: 4px;
       border-radius: 8px;
       cursor: grab;
       user-select: none;
       font-size: 1.1em;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      text-align: center;
+      padding: 6px 10px;
     }
 
     input[type="text"] {
@@ -156,7 +171,6 @@
       max-width: 300px;
     }
 
-    /* STRONG FULL SCREEN SHAKE - applied to entire html */
     @keyframes fullscreen-shake {
       0%, 100% { transform: translate3d(0, 0, 0); }
       10%, 30%, 50%, 70%, 90% { transform: translate3d(-15px, 10px, 0) rotate(-2deg); }
@@ -165,11 +179,8 @@
 
     .fullscreen-shake {
       animation: fullscreen-shake 0.3s ease-in-out 6;
-      /* will run ~1.8 seconds total */
-      /* For smoother effect, keep animation-fill-mode default */
     }
 
-    /* Glitch flicker animation */
     @keyframes glitch-flicker {
       0%, 100% { opacity: 1; filter: none; }
       20%, 80% { opacity: 0.6; filter: blur(1.5px) contrast(2); }
@@ -180,13 +191,13 @@
       animation: glitch-flicker 0.3s linear 6;
     }
 
-    /* Character select styles */
     .character-options {
       display: flex;
       justify-content: center;
       gap: 30px;
       margin-top: 20px;
     }
+
     .character {
       width: 100px;
       border: 2px solid transparent;
@@ -194,6 +205,7 @@
       transition: 0.3s;
       cursor: pointer;
     }
+
     .character:hover {
       border-color: #00f0ff;
       transform: scale(1.1);
@@ -201,14 +213,12 @@
   </style>
 </head>
 <body>
-
-<div class="container">
-  <h1>Spot the Red Flag</h1>
-  <div class="progress" id="progress"></div>
-  <div id="game"></div>
-</div>
-
-<script>
+  <div class="container">
+    <h1>Spot the Red Flag</h1>
+    <div class="progress" id="progress"></div>
+    <div id="game"></div>
+  </div>
+  <script>
   const questions = [
     {
       type: 'safeUnsafe',
@@ -325,7 +335,7 @@
     setTimeout(() => {
       html.classList.remove('fullscreen-shake', 'glitch-flicker');
       disableInputs(false);
-    }, 1800); // animation duration 0.3s * 6 iterations = 1.8s
+    }, 1800);
   }
 
   function showHint(text) {
@@ -361,30 +371,27 @@
         <button class="unsafe" onclick="checkSafeUnsafe('UNSAFE')">UNSAFE</button>
         <div id="feedback" class="feedback"></div>
       `;
-    }
-    else if (q.type === 'multipleChoice') {
+    } else if (q.type === 'multipleChoice') {
       game.innerHTML = `<p class="question-text">${q.text}</p>`;
       q.options.forEach(opt => {
-        game.innerHTML += `<button onclick="checkMC('${escapeHTML(opt)}')">${opt}</button>`;
+        game.innerHTML += `<button onclick="checkMC('${opt.replace(/'/g, "\\'")}')">${opt}</button>`;
       });
       game.innerHTML += `<div id="feedback" class="feedback"></div>`;
-    }
-    else if (q.type === 'textInput') {
+    } else if (q.type === 'textInput') {
       game.innerHTML = `
         <p class="question-text">${q.text}</p>
         <input type="text" id="textAnswer" placeholder="Type your answer..." />
         <button onclick="checkText()">Submit</button>
         <div id="feedback" class="feedback"></div>
       `;
-    }
-    else if (q.type === 'dragDrop') {
+    } else if (q.type === 'dragDrop') {
       game.innerHTML = `
         <p class="question-text">${q.text}</p>
         <div class="drag-area">
           <div id="left" class="zone">🚨 Red Flags</div>
           <div id="right" class="zone">✅ Safe</div>
         </div>
-        <div id="draggables" style="margin-top: 20px;"></div>
+        <div id="draggables" style="margin-top: 20px; display: flex; flex-wrap: wrap; gap: 8px; justify-content: center;"></div>
         <button onclick="checkDrag()">Submit</button>
         <div id="feedback" class="feedback"></div>
       `;
@@ -408,18 +415,13 @@
       });
 
       const containers = [document.getElementById('left'), document.getElementById('right'), dragContainer];
-
       containers.forEach(zone => {
         zone.ondragover = e => e.preventDefault();
-
         zone.ondrop = e => {
           e.preventDefault();
           const data = JSON.parse(e.dataTransfer.getData('text/plain'));
-
-          if ([...zone.children].some(el => el.textContent === data.text)) return;
-
-          const allContainers = [dragContainer, document.getElementById('left'), document.getElementById('right')];
-          allContainers.forEach(c => {
+          const allZones = [dragContainer, document.getElementById('left'), document.getElementById('right')];
+          allZones.forEach(c => {
             const found = [...c.children].find(el => el.textContent === data.text);
             if (found) c.removeChild(found);
           });
@@ -429,7 +431,6 @@
           newEl.className = 'draggable';
           newEl.dataset.type = data.type;
           newEl.draggable = true;
-
           newEl.ondragstart = e => {
             e.dataTransfer.setData('text/plain', JSON.stringify({ text: data.text, type: data.type }));
           };
@@ -438,11 +439,14 @@
         };
       });
     }
-    disableInputs(false);
-  }
 
-  function escapeHTML(str) {
-    return str.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#039;");
+    // Reduce spacing bottom margin for questions 2,4,6,9
+    if ([1,3,5,8].includes(current)) {
+      const qText = document.querySelector('.question-text');
+      if (qText) qText.style.marginBottom = '8px';
+    }
+
+    disableInputs(false);
   }
 
   function checkSafeUnsafe(ans) {
@@ -462,7 +466,7 @@
     } else {
       feedback.textContent = "❌ Not quite.";
       feedback.style.color = "#ff5252";
-      showHint(q.hint || "Try again.");
+      showHint(q.hint);
       triggerErrorEffect();
     }
   }
@@ -484,7 +488,7 @@
     } else {
       feedback.textContent = "❌ Nope. Think again.";
       feedback.style.color = "#ff5252";
-      showHint(q.hint || "Try again.");
+      showHint(q.hint);
       triggerErrorEffect();
     }
   }
@@ -507,7 +511,7 @@
     } else {
       feedback.textContent = "❌ Try to be more specific.";
       feedback.style.color = "#ff5252";
-      showHint(q.hint || "Try again.");
+      showHint(q.hint);
       triggerErrorEffect();
     }
   }
@@ -518,21 +522,21 @@
     clearHint();
     const feedback = document.getElementById("feedback");
 
-    const leftZone = document.getElementById("left");
-    const rightZone = document.getElementById("right");
+    const left = document.getElementById("left");
+    const right = document.getElementById("right");
 
-    const leftTypes = [...leftZone.children].map(el => el.dataset.type);
-    const rightTypes = [...rightZone.children].map(el => el.dataset.type);
+    const leftItems = [...left.children].map(el => el.dataset.type);
+    const rightItems = [...right.children].map(el => el.dataset.type);
 
-    if (leftTypes.length !== q.redFlags.length || rightTypes.length !== q.greenFlags.length) {
+    if (leftItems.length !== q.redFlags.length || rightItems.length !== q.greenFlags.length) {
       feedback.textContent = "❌ Please place all items correctly.";
       feedback.style.color = "#ff5252";
-      showHint(q.hint || "Make sure all red flags are on the left, safe behaviors on the right.");
+      showHint(q.hint);
       triggerErrorEffect();
       return;
     }
 
-    const correct = leftTypes.every(t => t === 'red') && rightTypes.every(t => t === 'green');
+    const correct = leftItems.every(t => t === 'red') && rightItems.every(t => t === 'green');
 
     if (correct) {
       score++;
@@ -545,7 +549,7 @@
     } else {
       feedback.textContent = "❌ Oops! Some items are in the wrong zone.";
       feedback.style.color = "#ff5252";
-      showHint(q.hint || "Make sure all red flags are on the left, safe behaviors on the right.");
+      showHint(q.hint);
       triggerErrorEffect();
     }
   }
@@ -572,6 +576,10 @@
   }
 
   renderCharacterSelection();
-</script>
+  </script>
 </body>
 </html>
+
+
+
+
